@@ -1,0 +1,315 @@
+# Базовые настройки сервера Tempo
+server:
+  http_listen_port: $CRMESSENGER_TEMPO_HTTP_PORT
+  grpc_listen_port: $CRMESSENGER_TEMPO_GRPC_PORT
+  log_level: debug
+
+distributor:
+  receivers:
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:$CRMESSENGER_TEMPO_OTLP_GRPC_PORT
+        http:
+          endpoint: 0.0.0.0:$CRMESSENGER_TEMPO_OTLP_HTTP_PORT
+
+  # Настройки распределения нагрузки
+  log_received_spans: true
+  
+  # Ограничения для предотвращения перегрузки
+  rate_limit: 100000
+  rate_limit_burst: 50000
+
+# Конфигурация ингестера (обрабатывает и сохраняет traces)
+ingester:
+  # Время ожидания перед записью trace в хранилище
+  trace_idle_period: 10s
+  
+  # Максимальный размер блока в памяти
+  max_block_bytes: 1048576  # 1MB
+  
+  # Максимальная продолжительность блока
+  max_block_duration: 5m
+  
+  # Настройки WAL (Write-Ahead Log)
+  complete_block_timeout: 15m
+  
+  # Ограничения для предотвращения OOM
+  max_traces_per_user: 10000
+  
+  # Флаш интервал для метрик
+  flush_check_period: 10s
+  
+  # Lifecycler для кластерной конфигурации
+  lifecycler:
+    # Адрес для других компонентов кластера
+    address: 127.0.0.1
+    
+    # Настройки кольца (ring)
+    ring:
+      kvstore:
+        store: inmemory
+        # Для продуктивной среды используйте consul или etcd:
+        # store: consul
+        # consul:
+        #   host: localhost:8500
+      
+      # Фактор репликации (количество копий данных)
+      replication_factor: 1
+      
+      # Токены для распределения нагрузки
+      tokens_file_path: /var/tempo/tokens
+    
+    # Время финального сна перед выключением
+    final_sleep: 0s
+    
+    # Интервал обновления heartbeat
+    heartbeat_period: 5s
+    
+    # Время ожидания при присоединении к кольцу
+    join_after: 0s
+
+# Конфигурация компактора (объединяет блоки)
+compactor:
+  # Настройки компактирования
+  compaction:
+    # Окно времени для компактирования блоков
+    compaction_window: 1h
+    
+    # Максимальный размер компактированного блока
+    max_block_bytes: 104857600  # 100MB
+    
+    # Время хранения блоков
+    block_retention: 24h
+    
+    # Время хранения компактированных блоков
+    compacted_block_retention: 1h
+    
+    # Время между проверками на компактирование
+    compaction_cycle: 30s
+    
+    # Максимальное время компактирования
+    max_compaction_objects: 6000000
+  
+  # Рабочая директория компактора
+  working_directory: /var/tempo/compactor
+
+# Конфигурация query-frontend (прокси для запросов)
+query_frontend:
+  # Максимальное количество одновременных запросов
+  max_outstanding_per_tenant: 100
+  
+  # Максимальный размер запроса в байтах
+  max_query_expression_size_bytes: 131072  # 128KB
+  
+  # Настройки кеширования результатов
+  search:
+    # Время жизни кеша для поисковых запросов
+    cache_control:
+      max_age: 1h
+  
+  # Настройки для TraceQL запросов
+  trace_by_id:
+    # Кеширование по trace ID
+    cache_control:
+      max_age: 1h
+
+# Конфигурация querier (выполняет запросы)
+querier:
+  # Настройки поиска
+  search:
+    # Максимальная продолжительность поиска
+    max_duration: 0s  # 0 = без ограничений
+    
+    # Количество запросов к хранилищу
+    query_backend_after: 15m
+    
+    # Предпочитаемый размер блока для поиска
+    preferred_block_bytes: 5242880  # 5MB
+  
+  # Максимальное количество одновременных запросов
+  max_concurrent_queries: 5
+  
+  # Таймауты
+  frontend_worker:
+    # Адрес query-frontend
+    frontend_address: 127.0.0.1:$CRMESSENGER_TEMPO_GRPC_PORT
+    
+    # Количество воркеров
+    parallelism: 2
+    
+    # Размер очереди запросов
+    match_max_concurrent: true
+
+# Конфигурация хранилища
+storage:
+  trace:
+    # Локальное хранилище для разработки
+    backend: local
+    local:
+      path: /var/tempo/traces
+    
+    # Для продуктивной среды используйте S3/GCS:
+    # backend: s3
+    # s3:
+    #   endpoint: s3.amazonaws.com
+    #   bucket: tempo-traces
+    #   region: us-east-1
+    #   access_key: ${TEMPO_S3_ACCESS_KEY}
+    #   secret_key: ${TEMPO_S3_SECRET_KEY}
+    #   insecure: false
+    #   part_size: 5242880  # 5MB
+    
+    # GCS пример:
+    # backend: gcs
+    # gcs:
+    #   bucket_name: tempo-traces
+    #   prefix: tempo
+    #   object_prefix: traces
+    
+    # Настройки пула подключений
+    pool:
+      max_workers: 400
+      queue_depth: 20000
+    
+    # WAL конфигурация
+    wal:
+      path: /var/tempo/wal
+      
+    # Блочный список
+    blocklist_poll: 5m
+    
+    # Кеш для метаданных блоков
+    cache: redis
+    
+    # Кеш для фонового поиска
+    background_cache: redis
+
+# Генератор метрик (создает метрики из traces)
+metrics_generator:
+  # Включаем генератор метрик
+  registry:
+    external_labels:
+      source: tempo
+      cluster: crmessenger
+  
+  # Конфигурация хранилища для промежуточных данных
+  storage:
+    path: /var/tempo/generator/wal
+    
+    # Remote write в Victoria Metrics
+    remote_write:
+      - url: http://$CRMESSENGER_VICTORIA_METRICS_CONTAINER_NAME:$CRMESSENGER_VICTORIA_METRICS_HTTP_PORT/api/v1/write
+        send_exemplars: true
+        headers:
+          X-Scope-OrgID: crmessenger
+  
+  # Процессоры для генерации метрик
+  processor:
+    # Service graphs (графы сервисов)
+    service_graphs:
+      # Максимальные элементы в кеше
+      max_items: 10000
+      
+      # Время ожидания для связывания spans
+      wait: 10s
+      
+      # Воркеры для обработки
+      workers: 2
+    
+    # Span метрики
+    span_metrics:
+      # Максимальные элементы в кеше
+      max_items: 100000
+      
+      # Дополнительные измерения
+      dimensions:
+        - service.name
+        - service.namespace
+        - span.name
+        - span.kind
+        - status.code
+      
+      # Фильтрация по политикам
+      filter_policies:
+        - include:
+            match_type: strict
+            attributes:
+              - key: service.name
+                value: crmessenger.*
+
+redis:
+  addresses: $CRMESSENGER_MONITORING_REDIS_CONTAINER_NAME:$CRMESSENGER_MONITORING_REDIS_PORT
+  timeout: 500ms
+  max_idle_conns: 16
+  db: 1
+
+  results:
+    addresses: $CRMESSENGER_MONITORING_REDIS_CONTAINER_NAME:$CRMESSENGER_MONITORING_REDIS_PORT
+    timeout: 500ms
+    max_idle_conns: 16
+    db: 2
+
+  block_contents:
+    addresses: $CRMESSENGER_MONITORING_REDIS_CONTAINER_NAME:$CRMESSENGER_MONITORING_REDIS_PORT
+    timeout: 500ms
+    max_idle_conns: 16
+    db: 3
+
+  # Дополнительные настройки Redis
+  master_name: ""  # Для Redis Sentinel (если используется)
+  pool_size: 100   # Размер пула подключений
+  min_idle_conns: 5 # Минимальные idle соединения
+
+
+# Глобальные ограничения и переопределения
+overrides:
+  # Настройки по умолчанию для всех тенантов
+  defaults:
+    # Ограничения ингестера
+    ingestion_rate_limit_bytes: 20971520  # 20MB/s
+    ingestion_burst_size_bytes: 20971520  # 20MB
+    
+    # Ограничения по пользователю
+    max_traces_per_user: 50000
+    max_spans_per_trace: 100000
+    max_bytes_per_trace: 52428800  # 50MB
+    
+    # Ограничения для поиска
+    max_search_duration: 168h  # 7 дней
+    max_spans_per_span_set: 1000
+    
+    # Настройки генератора метрик
+    metrics_generator:
+      processors:
+        - service-graphs
+        - span-metrics
+      
+      # Максимальные активные серии
+      max_active_series: 100000
+      
+      # Ограничения коллекции
+      collection_interval: 15s
+    
+    # Ограничения блоков
+    block_retention: 168h  # 7 дней
+
+  # Специфичные настройки для тенантов
+  per_tenant_override_config: /etc/tempo/overrides.yaml
+
+# Настройки мультитенантности (опционально)
+multitenancy_enabled: false
+
+# Аналитика и мониторинг
+analytics:
+  reporting_enabled: false
+
+# Настройки логирования
+log:
+  level: info
+  format: json
+
+# Настройки для internal server (метрики, healthcheck)
+internal_server:
+  enable: true
+  http_listen_port: 3201

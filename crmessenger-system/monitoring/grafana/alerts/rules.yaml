@@ -1,0 +1,177 @@
+# monitoring/grafana/alerts/infrastructure-alerts.yml
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: infrastructure
+    folder: Infrastructure Alerts
+    interval: 1m
+    rules:
+      # CPU Alert
+      - uid: cpu-high-usage
+        title: High CPU Usage
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: victoria-metrics
+            model:
+              expr: |
+                100 - (avg by (instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: victoria-metrics
+            model:
+              expr: |
+                100 - (avg by (container) (rate(container_cpu_usage_seconds_total[5m])) * 100)
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            conditions:
+              - evaluator:
+                  params:
+                    - 80
+                  type: gt
+                reducer:
+                  params: []
+                  type: avg
+                type: query
+            model:
+              expr: A
+              refId: C
+        noDataState: NoData
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          summary: "CPU usage is above 80% on {{ $labels.instance }}"
+          description: |
+            CPU usage has been above 80% for more than 5 minutes.
+            Current value: {{ $values.A }}%
+            Instance: {{ $labels.instance }}
+          runbook_url: https://wiki.example.com/runbooks/high-cpu
+          __dashboardUid__: system-overview
+          __panelId__: "2"
+        labels:
+          severity: critical
+          team: infrastructure
+          component: cpu
+
+      # Memory Alert
+      - uid: memory-high-usage
+        title: High Memory Usage
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: victoria-metrics
+            model:
+              expr: |
+                (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: victoria-metrics
+            model:
+              expr: |
+                (sum by (container) (container_memory_working_set_bytes) / sum by (container) (container_spec_memory_limit_bytes)) * 100
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            conditions:
+              - evaluator:
+                  params:
+                    - 85
+                  type: gt
+                reducer:
+                  params: []
+                  type: avg
+                type: query
+            model:
+              expr: A
+              refId: C
+        noDataState: NoData
+        execErrState: Alerting
+        for: 5m
+        annotations:
+          summary: "Memory usage is above 85% on {{ $labels.instance }}"
+          description: |
+            Memory usage has been above 85% for more than 5 minutes.
+            Current value: {{ $values.A }}%
+            Instance: {{ $labels.instance }}
+            
+            Top memory consumers:
+            {{ range $k, $v := $values.B }}
+            - {{ $k }}: {{ $v }}%
+            {{ end }}
+          runbook_url: https://wiki.example.com/runbooks/high-memory
+        labels:
+          severity: critical
+          team: infrastructure
+          component: memory
+
+      # HTTP 5xx Errors Alert
+      - uid: http-5xx-errors
+        title: High HTTP 5xx Error Rate
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: victoria-metrics
+            model:
+              expr: |
+                sum by (service, method, endpoint) (rate(http_requests_total{status=~"5.."}[5m])) > 0
+              refId: A
+          - refId: B
+            relativeTimeRange:
+              from: 600
+              to: 0
+            datasourceUid: victoria-metrics
+            model:
+              expr: |
+                sum by (service) (rate(http_requests_total{status=~"5.."}[5m])) 
+                / 
+                sum by (service) (rate(http_requests_total[5m])) * 100
+              refId: B
+          - refId: C
+            datasourceUid: __expr__
+            conditions:
+              - evaluator:
+                  params:
+                    - 5
+                  type: gt
+                reducer:
+                  params: []
+                  type: avg
+                type: query
+            model:
+              expr: B
+              refId: C
+        noDataState: NoData
+        execErrState: Alerting
+        for: 2m
+        annotations:
+          summary: "High 5xx error rate in {{ $labels.service }}"
+          description: |
+            Service {{ $labels.service }} has more than 5% of 5xx errors.
+            Current error rate: {{ $values.B }}%
+            
+            Affected endpoints:
+            {{ range $k, $v := $values.A }}
+            - {{ $k }}: {{ $v }} errors/sec
+            {{ end }}
+            
+            Check logs for details:
+            https://grafana.example.com/explore?left=["now-1h","now","Loki",{"expr":"{service=\"{{ $labels.service }}\"} |= \"error\""}]
+          runbook_url: https://wiki.example.com/runbooks/http-5xx-errors
+          __dashboardU

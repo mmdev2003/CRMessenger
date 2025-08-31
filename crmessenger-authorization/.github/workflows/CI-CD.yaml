@@ -1,0 +1,27 @@
+name: CI/CD
+on:
+  push:
+    branches:
+      - main
+jobs:
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Connect to server and execute commands
+        env:
+            SERVER: 193.124.47.135
+            USER: root
+            PASSWORD: ${{ secrets.SSH_PASSWORD }}
+
+        run: |
+          apt install sshpass -y
+          sshpass -p "$PASSWORD" ssh -o StrictHostKeyChecking=no $USER@$SERVER << EOF
+          cd wewall/wewall-tg-bot
+          git pull
+          cd ../wewall-system
+          docker-compose up -d --no-deps --build wewall-tg-bot
+          EOF

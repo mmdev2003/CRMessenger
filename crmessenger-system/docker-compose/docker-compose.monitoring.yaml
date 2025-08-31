@@ -1,0 +1,224 @@
+networks:
+  net:
+    name: net
+    external: true  # Создается в docker-compose.db.yml
+
+services:
+  crmessenger-monitoring-redis-exporter:
+    image: oliver006/redis_exporter:latest
+    container_name: "${CRMESSENGER_REDIS_EXPORTER_CONTAINER_NAME}"
+    ports:
+      - "${CRMESSENGER_REDIS_EXPORTER_PORT}:9121"
+    environment:
+      REDIS_ADDR: "redis://${CRMESSENGER_MONITORING_REDIS_CONTAINER_NAME}:${CRMESSENGER_MONITORING_REDIS_PORT}"
+      REDIS_PASSWORD: "${CRMESSENGER_MONITORING_REDIS_PASSWORD}"
+    restart: unless-stopped
+    networks:
+      - net
+
+  crmessenger-postgres-exporter-authorization:
+    image: quay.io/prometheuscommunity/postgres-exporter:latest
+    container_name: "${CRMESSENGER_POSTGRES_EXPORTER_AUTHORIZATION_CONTAINER_NAME}"
+    ports:
+      - "${CRMESSENGER_POSTGRES_EXPORTER_AUTHORIZATION_PORT}:9187"
+    environment:
+      DATA_SOURCE_URI: "${CRMESSENGER_AUTHORIZATION_POSTGRES_CONTAINER_NAME}:5432/postgres?sslmode=disable"
+      DATA_SOURCE_USER: "${CRMESSENGER_AUTHORIZATION_POSTGRES_USER}"
+      DATA_SOURCE_PASS: "${CRMESSENGER_AUTHORIZATION_POSTGRES_PASSWORD}"
+      PG_EXPORTER_DISABLE_SETTINGS_METRICS: "false"
+      PG_EXPORTER_AUTO_DISCOVER_DATABASES: "true"
+      PG_EXPORTER_EXCLUDE_DATABASES: "template0,template1"
+    restart: unless-stopped
+    networks:
+      - net
+
+  crmessenger-postgres-exporter-authentication:
+    image: quay.io/prometheuscommunity/postgres-exporter:latest
+    container_name: "${CRMESSENGER_POSTGRES_EXPORTER_AUTHENTICATION_CONTAINER_NAME}"
+    ports:
+      - "${CRMESSENGER_POSTGRES_EXPORTER_AUTHENTICATION_PORT}:9187"
+    environment:
+      DATA_SOURCE_URI: "${CRMESSENGER_AUTHENTICATION_POSTGRES_CONTAINER_NAME}:5432/postgres?sslmode=disable"
+      DATA_SOURCE_USER: "${CRMESSENGER_AUTHENTICATION_POSTGRES_USER}"
+      DATA_SOURCE_PASS: "${CRMESSENGER_AUTHENTICATION_POSTGRES_PASSWORD}"
+      PG_EXPORTER_DISABLE_SETTINGS_METRICS: "false"
+      PG_EXPORTER_AUTO_DISCOVER_DATABASES: "true"
+      PG_EXPORTER_EXCLUDE_DATABASES: "template0,template1"
+    restart: unless-stopped
+    networks:
+      - net
+
+  crmessenger-postgres-exporter-account:
+    image: quay.io/prometheuscommunity/postgres-exporter:latest
+    container_name: "${CRMESSENGER_POSTGRES_EXPORTER_ACCOUNT_CONTAINER_NAME}"
+    ports:
+      - "${CRMESSENGER_POSTGRES_EXPORTER_ACCOUNT_PORT}:9187"
+    environment:
+      DATA_SOURCE_URI: "${CRMESSENGER_ACCOUNT_POSTGRES_CONTAINER_NAME}:5432/postgres?sslmode=disable"
+      DATA_SOURCE_USER: "${CRMESSENGER_ACCOUNT_POSTGRES_USER}"
+      DATA_SOURCE_PASS: "${CRMESSENGER_ACCOUNT_POSTGRES_PASSWORD}"
+      PG_EXPORTER_DISABLE_SETTINGS_METRICS: "false"
+      PG_EXPORTER_AUTO_DISCOVER_DATABASES: "true"
+      PG_EXPORTER_EXCLUDE_DATABASES: "template0,template1"
+    restart: unless-stopped
+    networks:
+      - net
+
+  crmessenger-postgres-exporter-telegram:
+    image: quay.io/prometheuscommunity/postgres-exporter:latest
+    container_name: "${CRMESSENGER_POSTGRES_EXPORTER_TELEGRAM_CONTAINER_NAME}"
+    environment:
+      DATA_SOURCE_URI: "${CRMESSENGER_TELEGRAM_POSTGRES_CONTAINER_NAME}:5432/postgres?sslmode=disable"
+      DATA_SOURCE_USER: "${CRMESSENGER_TELEGRAM_POSTGRES_USER}"
+      DATA_SOURCE_PASS: "${CRMESSENGER_TELEGRAM_POSTGRES_PASSWORD}"
+      PG_EXPORTER_DISABLE_SETTINGS_METRICS: "false"
+      PG_EXPORTER_AUTO_DISCOVER_DATABASES: "true"
+      PG_EXPORTER_EXCLUDE_DATABASES: "template0,template1"
+    ports:
+      - "${CRMESSENGER_POSTGRES_EXPORTER_TELEGRAM_PORT}:9187"
+    restart: unless-stopped
+    networks:
+      - net
+    depends_on:
+      - crmessenger-telegram-postgres
+
+    # PostgreSQL Exporter для WhatsApp DB
+  crmessenger-postgres-exporter-whatsapp:
+    image: quay.io/prometheuscommunity/postgres-exporter:latest
+    container_name: "${CRMESSENGER_POSTGRES_EXPORTER_WHATSAPP_CONTAINER_NAME}"
+    environment:
+      DATA_SOURCE_URI: "${CRMESSENGER_WHATSAPP_POSTGRES_CONTAINER_NAME}:5432/postgres?sslmode=disable"
+      DATA_SOURCE_USER: "${CRMESSENGER_WHATSAPP_POSTGRES_USER}"
+      DATA_SOURCE_PASS: "${CRMESSENGER_WHATSAPP_POSTGRES_PASSWORD}"
+      PG_EXPORTER_DISABLE_SETTINGS_METRICS: "false"
+      PG_EXPORTER_AUTO_DISCOVER_DATABASES: "true"
+      PG_EXPORTER_EXCLUDE_DATABASES: "template0,template1"
+    ports:
+      - "${CRMESSENGER_POSTGRES_EXPORTER_WHATSAPP_PORT}:9187"
+    restart: unless-stopped
+    networks:
+      - net
+
+    # PostgreSQL Exporter для WhatsApp Device DB
+  crmessenger-postgres-exporter-whatsapp-device:
+    image: quay.io/prometheuscommunity/postgres-exporter:latest
+    container_name: "${CRMESSENGER_POSTGRES_EXPORTER_WHATSAPP_DEVICE_CONTAINER_NAME:-postgres-exporter-whatsapp-device}"
+    environment:
+      DATA_SOURCE_URI: "${CRMESSENGER_WHATSAPP_DEVICE_POSTGRES_CONTAINER_NAME}:5432/postgres?sslmode=disable"
+      DATA_SOURCE_USER: "${CRMESSENGER_WHATSAPP_DEVICE_POSTGRES_USER}"
+      DATA_SOURCE_PASS: "${CRMESSENGER_WHATSAPP_DEVICE_POSTGRES_PASSWORD}"
+      PG_EXPORTER_DISABLE_SETTINGS_METRICS: "false"
+      PG_EXPORTER_AUTO_DISCOVER_DATABASES: "true"
+      PG_EXPORTER_EXCLUDE_DATABASES: "template0,template1"
+    ports:
+      - "${CRMESSENGER_POSTGRES_EXPORTER_WHATSAPP_DEVICE_PORT}:9187"
+    restart: unless-stopped
+    networks:
+      - net
+
+  crmessenger-postgres-exporter-grafana:
+    image: quay.io/prometheuscommunity/postgres-exporter:latest
+    container_name: "${CRMESSENGER_POSTGRES_EXPORTER_GRAFANA_CONTAINER_NAME}"
+    environment:
+      DATA_SOURCE_URI: "${CRMESSENGER_GRAFANA_POSTGRES_CONTAINER_NAME}:5432/postgres?sslmode=disable"
+      DATA_SOURCE_USER: "${CRMESSENGER_GRAFANA_POSTGRES_USER}"
+      DATA_SOURCE_PASS: "${CRMESSENGER_GRAFANA_POSTGRES_PASSWORD}"
+      PG_EXPORTER_DISABLE_SETTINGS_METRICS: "false"
+      PG_EXPORTER_AUTO_DISCOVER_DATABASES: "true"
+      PG_EXPORTER_EXCLUDE_DATABASES: "template0,template1"
+    ports:
+      - "${CRMESSENGER_POSTGRES_EXPORTER_GRAFANA_PORT}:9187"
+    restart: unless-stopped
+    networks:
+      - net
+
+  crmessenger-vmagent:
+    image: victoriametrics/vmagent:latest
+    container_name: "${CRMESSENGER_VMAGENT_CONTAINER_NAME}"
+    volumes:
+      - "${CRMESSENGER_VMAGENT_CONFIG_FILE}:/etc/vmagent/vmagent.yml:ro"
+    command:
+      - "-promscrape.config=/etc/vmagent/vmagent.yml"
+    restart: unless-stopped
+    networks:
+      - net
+
+  crmessenger-otel-collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    container_name: "${CRMESSENGER_OTEL_COLLECTOR_CONTAINER_NAME}"
+    volumes:
+      - "/var/lib/docker/containers:/var/lib/docker/containers:ro"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+      - "/var/log:/var/log:ro"
+      - "${CRMESSENGER_OTEL_COLLECTOR_CONFIG_FILE}:/etc/otel-collector/config.yaml:ro"
+    ports:
+      - "${CRMESSENGER_OTEL_COLLECTOR_GRPC_PORT}:${CRMESSENGER_OTEL_COLLECTOR_GRPC_PORT}"
+      - "${CRMESSENGER_OTEL_COLLECTOR_HTTP_PORT}:${CRMESSENGER_OTEL_COLLECTOR_HTTP_PORT}"
+      - "8888:8888"   # Prometheus metrics exposed by the collector
+      - "8889:8889"   # Prometheus exporter metrics
+      - "13133:13133" # health_check extension
+      - "55679:55679" # zpages extension
+    command: "--config=/etc/otel-collector/config.yaml"
+    restart: unless-stopped
+    networks:
+      - net
+
+  crmessenger-grafana:
+    image: grafana/grafana:latest
+    container_name: "${CRMESSENGER_GRAFANA_CONTAINER_NAME}"
+    volumes:
+      - "${CRMESSENGER_GRAFANA_VOLUME_DIR}:/var/lib/grafana"
+      - "${CRMESSENGER_GRAFANA_CONFIG_FILE}:/etc/grafana/grafana.ini:ro"
+    ports:
+      - "${CRMESSENGER_GRAFANA_PORT}:3000"
+    networks:
+      - net
+
+  crmessenger-grafana-image-renderer:
+    image: grafana/grafana-image-renderer:latest
+    container_name: "${CRMESSENGER_GRAFANA_IMAGE_RENDER_CONTAINER_NAME}"
+    ports:
+      - "${CRMESSENGER_GRAFANA_IMAGE_RENDER_PORT}:8081"
+    environment:
+      ENABLE_METRICS: 'true'
+      HTTP_PORT: 8081
+    restart: unless-stopped
+    networks:
+      - net
+
+  crmessenger-node-exporter:
+    image: prom/node-exporter:latest
+    container_name: "${CRMESSENGER_NODE_EXPORTER_CONTAINER_NAME}"
+    volumes:
+      - "/proc:/host/proc:ro"
+      - "/sys:/host/sys:ro"
+      - "/:/host:ro"
+      - "${CRMESSENGER_NODE_EXPORTER_CONFIG_FILE}:/etc/node-exporter/node-exporter.yml:ro"
+    ports:
+      - "${CRMESSENGER_NODE_EXPORTER_PORT}:9100"
+    command:
+      - '--path.rootfs=/host'
+      - '--path.sysfs=/host/sys'
+      - '--path.procfs=/host/proc'
+      - '--config.file=/etc/node-exporter/node-exporter.yml'
+    restart: unless-stopped
+    networks:
+      - net
+
+  crmessenger-cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: "${CRMESSENGER_CADVISOR_CONTAINER_NAME}"
+    volumes:
+      - "/:/rootfs:ro"
+      - "/var/run:/var/run:ro"
+      - "/sys:/sys:ro"
+      - "/var/lib/docker/:/var/lib/docker:ro"
+      - "/dev/disk/:/dev/disk:ro"
+    ports:
+      - "${CRMESSENGER_CADVISOR_PORT}:8080"
+    privileged: true
+    devices:
+      - "/dev/kmsg"
+    restart: unless-stopped
+    networks:
+      - net

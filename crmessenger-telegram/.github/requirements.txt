@@ -1,0 +1,15 @@
+SQLAlchemy~=2.0.30
+asyncpg==0.29.0
+uvicorn==0.29.0
+aiohttp~=3.9.5
+fastapi==0.112.1
+PyYAML==6.0.2
+Kurigram==2.2.7
+pytz==2025.2
+ujson==5.10.0
+requests==2.32.3
+opentelemetry-api==1.33.1
+opentelemetry-sdk==1.33.1
+opentelemetry-semantic-conventions==0.54b1
+opentelemetry-exporter-otlp-proto-grpc==1.33.1
+opentelemetry-proto==1.33.1

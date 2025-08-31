@@ -1,0 +1,4 @@
+collectors:
+  enabled: "cpu,meminfo,diskstats,filesystem,netdev,netstat,stat,time,uname,loadavg"
+  filesystem:
+    mount-points-exclude: "^/(sys|proc|dev|host|etc)($|/)"

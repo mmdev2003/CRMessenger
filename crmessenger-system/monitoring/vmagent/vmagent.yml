@@ -1,0 +1,203 @@
+global:
+  scrape_interval: 15s
+  scrape_timeout: 10s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: "crmessenger"
+    environment: "production"
+
+scrape_configs:
+  - job_name: 'vmagent'
+    static_configs:
+      - targets: ['localhost:8429']
+    scrape_interval: 30s
+
+  - job_name: 'victoria-metrics'
+    static_configs:
+      - targets: ['$CRMESSENGER_VICTORIA_METRICS_CONTAINER_NAME:$CRMESSENGER_VICTORIA_METRICS_HTTP_PORT']
+    scrape_interval: 30s
+    metrics_path: '/metrics'
+
+  - job_name: 'postgres-authorization'
+    static_configs:
+      - targets: ['$CRMESSENGER_POSTGRES_EXPORTER_AUTHORIZATION_CONTAINER_NAME:9187']
+    scrape_interval: 30s
+    relabel_configs:
+      - source_labels: ['__address__']
+        target_label: 'instance'
+        replacement: 'authorization-db'
+      - target_label: 'service'
+        replacement: 'postgres-authorization'
+
+  - job_name: 'postgres-authentication'
+    static_configs:
+      - targets: ['$CRMESSENGER_POSTGRES_EXPORTER_AUTHENTICATION_CONTAINER_NAME:9187']
+    scrape_interval: 30s
+    relabel_configs:
+      - source_labels: ['__address__']
+        target_label: 'instance'
+        replacement: 'authentication-db'
+      - target_label: 'service'
+        replacement: 'postgres-authentication'
+
+  - job_name: 'postgres-account'
+    static_configs:
+      - targets: ['$CRMESSENGER_POSTGRES_EXPORTER_ACCOUNT_CONTAINER_NAME:9187']
+    scrape_interval: 30s
+    relabel_configs:
+      - source_labels: ['__address__']
+        target_label: 'instance'
+        replacement: 'account-db'
+      - target_label: 'service'
+        replacement: 'postgres-account'
+
+  - job_name: 'postgres-telegram'
+    static_configs:
+      - targets: ['$CRMESSENGER_POSTGRES_EXPORTER_TELEGRAM_CONTAINER_NAME:9187']
+    scrape_interval: 30s
+    relabel_configs:
+      - source_labels: ['__address__']
+        target_label: 'instance'
+        replacement: 'telegram-db'
+      - target_label: 'service'
+        replacement: 'postgres-telegram'
+
+  - job_name: 'postgres-whatsapp'
+    static_configs:
+      - targets: ['$CRMESSENGER_POSTGRES_EXPORTER_WHATSAPP_CONTAINER_NAME:9187']
+    scrape_interval: 30s
+    relabel_configs:
+      - source_labels: ['__address__']
+        target_label: 'instance'
+        replacement: 'whatsapp-db'
+      - target_label: 'service'
+        replacement: 'postgres-whatsapp'
+
+  - job_name: 'postgres-whatsapp-device'
+    static_configs:
+      - targets: ['$CRMESSENGER_POSTGRES_EXPORTER_WHATSAPP_DEVICE_CONTAINER_NAME:9187']
+    scrape_interval: 30s
+    relabel_configs:
+      - source_labels: ['__address__']
+        target_label: 'instance'
+        replacement: 'whatsapp-device-db'
+      - target_label: 'service'
+        replacement: 'postgres-whatsapp-device'
+
+  - job_name: 'postgres-grafana'
+    static_configs:
+      - targets: ['$CRMESSENGER_POSTGRES_EXPORTER_GRAFANA_CONTAINER_NAME:9187']
+    scrape_interval: 30s
+    relabel_configs:
+      - source_labels: ['__address__']
+        target_label: 'instance'
+        replacement: 'grafana-db'
+      - target_label: 'service'
+        replacement: 'postgres-grafana'
+
+  - job_name: 'redis-monitoring'
+    static_configs:
+      - targets: ['$CRMESSENGER_REDIS_EXPORTER_CONTAINER_NAME:9121']
+    scrape_interval: 30s
+    relabel_configs:
+      - source_labels: ['__address__']
+        target_label: 'instance'
+        replacement: 'monitoring-redis'
+      - target_label: 'service'
+        replacement: 'redis-monitoring'
+
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['$CRMESSENGER_GRAFANA_CONTAINER_NAME:$CRMESSENGER_GRAFANA_PORT']
+    scrape_interval: 30s
+    metrics_path: '/metrics'
+    relabel_configs:
+      - target_label: 'service'
+        replacement: 'grafana'
+
+  - job_name: 'loki'
+    static_configs:
+      - targets: ['$CRMESSENGER_LOKI_CONTAINER_NAME:$CRMESSENGER_LOKI_HTTP_PORT']
+    scrape_interval: 30s
+    metrics_path: '/metrics'
+    relabel_configs:
+      - target_label: 'service'
+        replacement: 'loki'
+
+  - job_name: 'tempo'
+    static_configs:
+      - targets: ['$CRMESSENGER_TEMPO_CONTAINER_NAME:$CRMESSENGER_TEMPO_HTTP_PORT']
+    scrape_interval: 30s
+    metrics_path: '/metrics'
+    relabel_configs:
+      - target_label: 'service'
+        replacement: 'tempo'
+
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['crmessenger-node-exporter:9100']
+    scrape_interval: 30s
+    relabel_configs:
+      - target_label: 'service'
+        replacement: 'node-exporter'
+
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['crmessenger-cadvisor:8080']
+    scrape_interval: 30s
+    relabel_configs:
+      - target_label: 'service'
+        replacement: 'cadvisor'
+
+    metric_relabel_configs:
+      - source_labels: ['__name__']
+        regex: 'container_(network_receive_bytes_total|network_transmit_bytes_total|cpu_usage_seconds_total|memory_usage_bytes|fs_usage_bytes|fs_limit_bytes)'
+        action: keep
+
+  # Приложения CRMessenger (если они экспортируют метрики)
+  # Раскомментировать и настроить по необходимости
+  
+  # - job_name: 'crmessenger-authorization'
+  #   static_configs:
+  #     - targets: ['crmessenger-authorization:8080']
+  #   scrape_interval: 30s
+  #   metrics_path: '/metrics'
+  #   relabel_configs:
+  #     - target_label: 'service'
+  #       replacement: 'authorization'
+
+  # - job_name: 'crmessenger-authentication'
+  #   static_configs:
+  #     - targets: ['crmessenger-authentication:8080']
+  #   scrape_interval: 30s
+  #   metrics_path: '/metrics'
+  #   relabel_configs:
+  #     - target_label: 'service'
+  #       replacement: 'authentication'
+
+  # - job_name: 'crmessenger-account'
+  #   static_configs:
+  #     - targets: ['crmessenger-account:8080']
+  #   scrape_interval: 30s
+  #   metrics_path: '/metrics'
+  #   relabel_configs:
+  #     - target_label: 'service'
+  #       replacement: 'account'
+
+  # - job_name: 'crmessenger-telegram'
+  #   static_configs:
+  #     - targets: ['crmessenger-telegram:8080']
+  #   scrape_interval: 30s
+  #   metrics_path: '/metrics'
+  #   relabel_configs:
+  #     - target_label: 'service'
+  #       replacement: 'telegram'
+
+  # - job_name: 'crmessenger-whatsapp'
+  #   static_configs:
+  #     - targets: ['crmessenger-whatsapp:8080']
+  #   scrape_interval: 30s
+  #   metrics_path: '/metrics'
+  #   relabel_configs:
+  #     - target_label: 'service'
+  #       replacement: 'whatsapp'

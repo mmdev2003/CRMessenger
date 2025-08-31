@@ -1,0 +1,47 @@
+user www-data;
+worker_processes auto;
+pid /run/nginx.pid;
+error_log /var/log/nginx/error.log;
+
+events {
+    worker_connections 768;
+}
+
+http {
+    server_names_hash_bucket_size 128;
+    sendfile on;
+    tcp_nopush on;
+    client_max_body_size 2048M;
+    types_hash_max_size 2048;
+    include /etc/nginx/mime.types;
+    default_type application/octet-stream;
+    ssl_protocols TLSv1 TLSv1.1 TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+    access_log /var/log/nginx/access.log;
+    gzip on;
+
+    server {
+        server_name $CRMESSENGER_DOMAIN;
+        listen 80;
+
+        location $CRMESSENGER_AUTHORIZATION_PREFIX {
+            proxy_pass http://127.0.0.1:$CRMESSENGER_AUTHORIZATION_PORT;
+        }
+
+        location $CRMESSENGER_AUTHENTICATION_PREFIX {
+            proxy_pass http://127.0.0.1:$CRMESSENGER_AUTHENTICATION_PORT;
+        }
+
+        location $CRMESSENGER_ACCOUNT_PREFIX {
+            proxy_pass http://127.0.0.1:$CRMESSENGER_ACCOUNT_PORT;
+        }
+
+        location $CRMESSENGER_TELEGRAM_PREFIX {
+            proxy_pass http://127.0.0.1:$CRMESSENGER_TELEGRAM_PORT;
+        }
+
+        location $CRMESSENGER_WHATSAPP_PREFIX {
+            proxy_pass http://127.0.0.1:$CRMESSENGER_WHATSAPP_PORT;
+        }
+    }
+}

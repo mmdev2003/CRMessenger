@@ -1,0 +1,120 @@
+apiVersion: 1
+
+deleteDatasources:
+  - name: Victoria Metrics
+    orgId: 1
+  - name: Loki
+    orgId: 1
+  - name: Tempo
+    orgId: 1
+
+datasources:
+  # Victoria Metrics - основной источник метрик
+  - name: Victoria Metrics
+    type: prometheus
+    access: proxy
+    url: http://victoria-metrics:8428
+    isDefault: true
+    jsonData:
+      timeInterval: "15s"
+      queryTimeout: "300s"
+      httpMethod: POST
+      customQueryParameters: "max_samples=50000000"
+      prometheusType: Prometheus
+      prometheusVersion: 2.40.0
+      incrementalQuerying: true
+      incrementalQueryOverlapWindow: 10m
+      disableMetricsLookup: false
+      cacheLevel: 'High'
+      exemplarTraceIdDestinations:
+        - datasourceUid: tempo
+          name: trace_id
+    editorMode: code
+    uid: victoria-metrics
+
+  # Loki - логи
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    uid: loki
+    jsonData:
+      maxLines: 5000
+      derivedFields:
+        - datasourceUid: tempo
+          matcherRegex: '"trace_id":"(\w+)"'
+          name: TraceID
+          url: '$${__value.raw}'
+        - datasourceUid: tempo
+          matcherRegex: '"span_id":"(\w+)"'
+          name: SpanID
+          url: '$${__value.raw}'
+      alerting:
+        enabled: true
+
+  # Tempo - трейсы
+  - name: Tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    uid: tempo
+    jsonData:
+      nodeGraph:
+        enabled: true
+      search:
+        hide: false
+      lokiSearch:
+        datasourceUid: loki
+      tracesToLogs:
+        datasourceUid: loki
+        tags:
+          - 'container'
+          - 'pod'
+          - 'namespace'
+          - 'service'
+        mappedTags:
+          - key: 'service.name'
+            value: 'service'
+        mapTagNamesEnabled: true
+        spanStartTimeShift: '-1h'
+        spanEndTimeShift: '1h'
+        filterByTraceID: true
+        filterBySpanID: true
+      serviceMap:
+        datasourceUid: victoria-metrics
+      tracesToMetrics:
+        datasourceUid: victoria-metrics
+        tags:
+          - key: 'service.name'
+            value: 'service'
+          - key: 'http.method'
+            value: 'method'
+          - key: 'http.status_code'
+            value: 'status_code'
+        queries:
+          - name: 'Request rate'
+            query: 'sum(rate(traces_spanmetrics_calls_total{$$__tags}[5m]))'
+          - name: 'Error rate'
+            query: 'sum(rate(traces_spanmetrics_calls_total{$$__tags, status_code=~"5.."}[5m]))'
+          - name: 'P95 latency'
+            query: 'histogram_quantile(0.95, sum(rate(traces_spanmetrics_latency_bucket{$$__tags}[5m])) by (le))'
+
+  # AlertManager
+  - name: AlertManager
+    type: alertmanager
+    access: proxy
+    url: http://alertmanager:9093
+    uid: alertmanager
+    jsonData:
+      implementation: prometheus
+      handleGrafanaManagedAlerts: true
+
+  # Prometheus для совместимости
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    uid: prometheus
+    jsonData:
+      timeInterval: "15s"
+      queryTimeout: "300s"

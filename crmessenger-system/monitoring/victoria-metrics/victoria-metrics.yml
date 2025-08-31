@@ -1,0 +1,239 @@
+# Victoria Metrics Configuration
+# Примечание: VM в основном настраивается через command-line флаги,
+# но этот конфиг может использоваться для дополнительных настроек
+
+# =============================================================================
+# ОСНОВНЫЕ НАСТРОЙКИ ХРАНЕНИЯ
+# =============================================================================
+
+# Настройки ретенции данных
+retention:
+  # Период хранения данных (по умолчанию 1 месяц)
+  period: "3y"  # 3 года хранения для вашей системы
+  
+  # Настройки для разных типов метрик с различными периодами хранения
+  filters:
+    # Критические метрики системы - долгое хранение
+    - metric_filter: '{__name__=~"up|node_.*|container_.*"}'
+      retention_period: "5y"
+    
+    # Метрики приложений - стандартное хранение  
+    - metric_filter: '{__name__=~"crmessenger_.*"}'
+      retention_period: "3y"
+    
+    # Отладочные метрики - короткое хранение
+    - metric_filter: '{__name__=~"debug_.*|test_.*"}'
+      retention_period: "30d"
+
+# =============================================================================
+# НАСТРОЙКИ ПРОИЗВОДИТЕЛЬНОСТИ
+# =============================================================================
+
+performance:
+  # Максимальное количество CPU cores для использования
+  # Если не указано, VM использует все доступные
+  max_concurrent_inserts: 32
+  
+  # Размер кэша для поиска метрик
+  search_cache_size: "256MB"
+  
+  # Настройки памяти
+  memory:
+    # Лимит памяти для кэширования данных
+    cache_size: "1GB"
+    
+    # Размер буфера для записи
+    max_insert_request_size: "32MB"
+
+# =============================================================================
+# НАСТРОЙКИ СЕТИ И БЕЗОПАСНОСТИ
+# =============================================================================
+
+server:
+  # HTTP порт (по умолчанию 8428)
+  http_listen_addr: ":$CRMESSENGER_VICTORIA_METRICS_HTTP_PORT"
+  
+  # Настройки TLS (если требуется)
+  tls:
+    enabled: false
+    cert_file: ""
+    key_file: ""
+  
+  # Ограничения запросов
+  limits:
+    # Максимальное время выполнения запроса
+    max_query_duration: "30s"
+    
+    # Максимальное количество серий в ответе
+    max_series_per_query: 100000
+    
+    # Максимальный размер ответа
+    max_response_size: "100MB"
+
+# =============================================================================
+# ИНТЕГРАЦИЯ С МОНИТОРИНГОМ
+# =============================================================================
+
+monitoring:
+  # Включить метрики самого VM
+  enable_self_metrics: true
+  
+  # Экспорт в Prometheus формате
+  prometheus:
+    enabled: true
+    path: "/metrics"
+  
+  # Интеграция с OpenTelemetry
+  opentelemetry:
+    enabled: true
+    # Эндпоинт для отправки в ваш Tempo
+    endpoint: "http://$CRMESSENGER_TEMPO_CONTAINER_NAME:$CRMESSENGER_TEMPO_OTLP_GRPC_PORT"
+
+# =============================================================================
+# НАСТРОЙКИ INGESTION (ПРИЁМ ДАННЫХ)
+# =============================================================================
+
+ingestion:
+  # Prometheus remote write
+  prometheus:
+    enabled: true
+    path: "/api/v1/write"
+    
+    # Настройки реляйдинга метрик
+    relabeling:
+      # Добавление лейблов для всех входящих метрик
+      - source_labels: [ "__name__" ]
+        target_label: "instance_type"
+        replacement: "crmessenger"
+      
+      # Нормализация имён метрик
+      - source_labels: [ "__name__" ]
+        regex: "(.+)_total$"
+        target_label: "__name__"
+        replacement: "${1}"
+    #
+    #  # InfluxDB протокол
+    #  influxdb:
+    #    enabled: true
+    #    listen_addr: ":8089"
+    #
+    #  # Graphite протокол
+    #  graphite:
+    #    enabled: true
+    #    listen_addr: ":2003"
+
+#  # OpenTSDB протокол
+#  opentsdb:
+#    enabled: true
+#    http_listen_addr: ":4242"
+#    tcp_listen_addr: ":4243"
+
+# =============================================================================
+# НАСТРОЙКИ BACKUP И RECOVERY
+# =============================================================================
+
+backup:
+  # Автоматические снапшоты
+  snapshots:
+    enabled: true
+    # Интервал создания снапшотов
+    interval: "24h"
+    # Количество снапшотов для хранения
+    retention_count: 30
+  
+  # Настройки для внешнего бэкапа (если используется vmbackup)
+#  remote_backup:
+#    enabled: false
+#    destination: "s3://backup-bucket/victoria-metrics/"
+#    credentials:
+#      access_key: ""
+#      secret_key: ""
+
+# =============================================================================
+# ЛОГИРОВАНИЕ И ОТЛАДКА
+# =============================================================================
+
+logging:
+  # Уровень логирования (INFO, WARN, ERROR, DEBUG)
+  level: "INFO"
+  
+  # Формат логов (json или logfmt)
+  format: "json"
+  
+  # Включить запись медленных запросов
+  slow_query_log:
+    enabled: true
+    threshold: "1s"
+  
+  # Отладочная информация
+  debug:
+    enabled: false
+    pprof_enabled: true
+
+# =============================================================================
+# ИНТЕГРАЦИЯ С ЭКОСИСТЕМОЙ
+# =============================================================================
+
+integrations:
+  # Настройки для Grafana
+  grafana:
+    # Включить CORS для Grafana
+    cors_enabled: true
+    allowed_origins: [ "*" ]
+  
+  # Настройки для вашего стека
+  ecosystem:
+    # Интеграция с Loki для логов
+    loki:
+      enabled: true
+      push_url: "http://$CRMESSENGER_LOKI_CONTAINER_NAME:$CRMESSENGER_LOKI_HTTP_PORT/loki/api/v1/push"
+    
+    # Интеграция с Tempo для трейсов
+    tempo:
+      enabled: true
+      endpoint: "http://$CRMESSENGER_TEMPO_CONTAINER_NAME:$CRMESSENGER_TEMPO_HTTP_PORT"
+    
+    # Redis для кэширования запросов
+    redis:
+      enabled: false
+      addr: "$CRMESSENGER_MONITORING_REDIS_CONTAINER_NAME:$CRMESSENGER_MONITORING_REDIS_PORT"
+      password: $CRMESSENGER_MONITORING_REDIS_PASSWORD
+      db: 4
+
+# =============================================================================
+# НАСТРОЙКИ ДЛЯ ВЫСОКОЙ НАГРУЗКИ
+# =============================================================================
+
+high_load:
+  # Настройки для обработки больших объёмов данных
+  series_limits:
+    # Максимальное количество новых серий в секунду
+    max_series_per_second: 10000
+    
+    # Лимит на уникальные метки
+    max_labels_per_series: 50
+  
+  # Настройки сэмплирования при высокой нагрузке
+  downsampling:
+    enabled: false
+    # Правила сэмплирования для старых данных
+    rules:
+      - retention: "7d"
+        resolution: "5s"
+      - retention: "30d"
+        resolution: "1m"
+      - retention: "1y"
+        resolution: "1h"
+
+
+#experimental:
+#  # Включить новые функции VM
+#  features:
+#    # Отслеживание статистики имён метрик (доступно с v1.113.0)
+#    track_metric_names_stats: true
+#
+#    # Улучшенная обработка памяти
+#    memory_optimization: true
+#
+#    # Экспериментальная поддержка streaming aggregation
+#    streaming_aggregation: false

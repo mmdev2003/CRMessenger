@@ -1,0 +1,79 @@
+apiVersion: 1
+
+providers:
+  - name: 'Infrastructure'
+    orgId: 1
+    folder: 'Infrastructure'
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/dashboards/infrastructure
+      foldersFromFilesStructure: true
+
+  - name: 'Applications'
+    orgId: 1
+    folder: 'Applications'
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/dashboards/applications
+      foldersFromFilesStructure: true
+
+  - name: 'Databases'
+    orgId: 1
+    folder: 'Databases'
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/dashboards/databases
+      foldersFromFilesStructure: true
+
+  - name: 'Message-brokers'
+    orgId: 1
+    folder: 'Message-brokers'
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/dashboards/message-brokers
+      foldersFromFilesStructure: true
+
+  - name: 'Logs'
+    orgId: 1
+    folder: 'Logs'
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/dashboards/logs
+      foldersFromFilesStructure: true
+
+  - name: 'Trace'
+    orgId: 1
+    folder: 'Trace'
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/dashboards/trace
+      foldersFromFilesStructure: true
+
+  - name: 'Alerts'
+    orgId: 1
+    folder: 'Alerts'
+    type: file
+    disableDeletion: true
+    updateIntervalSeconds: 10
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/dashboards/alerts
+      foldersFromFilesStructure: true

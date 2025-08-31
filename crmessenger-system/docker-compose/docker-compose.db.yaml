@@ -1,0 +1,169 @@
+networks:
+  net:
+    name: net
+    driver: bridge
+
+services:
+  crmessenger-authorization-postgres:
+    image: postgres:latest
+    container_name: "${CRMESSENGER_AUTHORIZATION_POSTGRES_CONTAINER_NAME}"
+    volumes:
+      - "${CRMESSENGER_AUTHORIZATION_POSTGRES_VOLUME_DIR}:/var/lib/postgresql/data"
+    ports:
+      - "${CRMESSENGER_AUTHORIZATION_POSTGRES_PORT}:5432"
+    environment:
+      POSTGRES_DB: "${CRMESSENGER_AUTHORIZATION_POSTGRES_DB_NAME}"
+      POSTGRES_USER: "${CRMESSENGER_AUTHORIZATION_POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${CRMESSENGER_AUTHORIZATION_POSTGRES_PASSWORD}"
+    restart: unless-stopped
+    networks:
+      - net
+
+  crmessenger-authentication-postgres:
+    image: postgres:latest
+    container_name: "${CRMESSENGER_AUTHENTICATION_POSTGRES_CONTAINER_NAME}"
+    volumes:
+      - "${CRMESSENGER_AUTHENTICATION_POSTGRES_VOLUME_DIR}:/var/lib/postgresql/data"
+    ports:
+      - "${CRMESSENGER_AUTHENTICATION_POSTGRES_PORT}:5432"
+    environment:
+      POSTGRES_DB: "${CRMESSENGER_AUTHENTICATION_POSTGRES_DB_NAME}"
+      POSTGRES_USER: "${CRMESSENGER_AUTHENTICATION_POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${CRMESSENGER_AUTHENTICATION_POSTGRES_PASSWORD}"
+    restart: unless-stopped
+    networks:
+      - net
+
+  crmessenger-account-postgres:
+    image: postgres:latest
+    container_name: "${CRMESSENGER_ACCOUNT_POSTGRES_CONTAINER_NAME}"
+    volumes:
+      - "${CRMESSENGER_ACCOUNT_POSTGRES_VOLUME_DIR}:/var/lib/postgresql/data"
+    ports:
+      - "${CRMESSENGER_ACCOUNT_POSTGRES_PORT}:5432"
+    environment:
+      POSTGRES_DB: "${CRMESSENGER_ACCOUNT_POSTGRES_DB_NAME}"
+      POSTGRES_USER: "${CRMESSENGER_ACCOUNT_POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${CRMESSENGER_ACCOUNT_POSTGRES_PASSWORD}"
+    restart: unless-stopped
+    networks:
+      - net
+
+  crmessenger-telegram-postgres:
+    image: postgres:latest
+    container_name: "${CRMESSENGER_TELEGRAM_POSTGRES_CONTAINER_NAME}"
+    volumes:
+      - "${CRMESSENGER_TELEGRAM_POSTGRES_VOLUME_DIR}:/var/lib/postgresql/data"
+    ports:
+      - "${CRMESSENGER_TELEGRAM_POSTGRES_PORT}:5432"
+    environment:
+      POSTGRES_DB: "${CRMESSENGER_TELEGRAM_POSTGRES_DB_NAME}"
+      POSTGRES_USER: "${CRMESSENGER_TELEGRAM_POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${CRMESSENGER_TELEGRAM_POSTGRES_PASSWORD}"
+    restart: unless-stopped
+    networks:
+      - net
+
+  crmessenger-whatsapp-postgres:
+    image: postgres:latest
+    container_name: "${CRMESSENGER_WHATSAPP_POSTGRES_CONTAINER_NAME}"
+    volumes:
+      - "${CRMESSENGER_WHATSAPP_POSTGRES_VOLUME_DIR}:/var/lib/postgresql/data"
+    ports:
+      - "${CRMESSENGER_WHATSAPP_POSTGRES_PORT}:5432"
+    environment:
+      POSTGRES_DB: "${CRMESSENGER_WHATSAPP_POSTGRES_DB_NAME}"
+      POSTGRES_USER: "${CRMESSENGER_WHATSAPP_POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${CRMESSENGER_WHATSAPP_POSTGRES_PASSWORD}"
+    restart: unless-stopped
+    networks:
+      - net
+
+  crmessenger-whatsapp-device-postgres:
+    image: postgres:latest
+    container_name: "${CRMESSENGER_WHATSAPP_DEVICE_POSTGRES_CONTAINER_NAME}"
+    environment:
+      POSTGRES_DB: "${CRMESSENGER_WHATSAPP_DEVICE_POSTGRES_DB_NAME}"
+      POSTGRES_USER: "${CRMESSENGER_WHATSAPP_DEVICE_POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${CRMESSENGER_WHATSAPP_DEVICE_POSTGRES_PASSWORD}"
+    volumes:
+      - "${CRMESSENGER_WHATSAPP_DEVICE_POSTGRES_VOLUME_DIR}-device:/var/lib/postgresql/data"
+    ports:
+      - "${CRMESSENGER_WHATSAPP_DEVICE_POSTGRES_PORT}:5432"
+    restart: unless-stopped
+    networks:
+      - net
+
+  crmessenger-grafana-postgres:
+    image: postgres:latest
+    container_name: "${CRMESSENGER_GRAFANA_POSTGRES_CONTAINER_NAME}"
+    environment:
+      POSTGRES_DB: "${CRMESSENGER_GRAFANA_POSTGRES_DB_NAME}"
+      POSTGRES_USER: "${CRMESSENGER_GRAFANA_POSTGRES_USER}"
+      POSTGRES_PASSWORD: "${CRMESSENGER_GRAFANA_POSTGRES_PASSWORD}"
+    volumes:
+      - "${CRMESSENGER_GRAFANA_POSTGRES_VOLUME_DIR}:/var/lib/postgresql/data"
+    ports:
+      - "${CRMESSENGER_GRAFANA_POSTGRES_PORT}:5432"
+    restart: unless-stopped
+    networks:
+      - net
+
+  crmessenger-monitoring-redis:
+    image: redis:latest
+    container_name: "{CRMESSENGER_MONITORING_REDIS_CONTAINER_NAME}"
+    ports:
+      - "${CRMESSENGER_MONITORING_REDIS_PORT}:6379"
+    volumes:
+      - "${CRMESSENGER_MONITORING_REDIS_CONFIG_FILE}:/usr/local/etc/redis/redis.conf"
+      - "${CRMESSENGER_MONITORING_REDIS_VOLUME_DIR}:/data"
+    command: "redis-server /usr/local/etc/redis/redis.conf"
+    restart: unless-stopped
+    networks:
+      - net
+
+  crmessenger-loki:
+    image: grafana/loki:latest
+    container_name: "${CRMESSENGER_LOKI_CONTAINER_NAME}"
+    volumes:
+      - "${CRMESSENGER_LOKI_CONFIG_FILE}:/etc/loki/loki.yaml:ro"
+      - "${CRMESSENGER_LOKI_VOLUME_DIR}:/loki"
+    ports:
+      - "${CRMESSENGER_LOKI_HTTP_PORT}:${CRMESSENGER_LOKI_HTTP_PORT}"
+      - "${CRMESSENGER_LOKI_GRPC_PORT}:${CRMESSENGER_LOKI_GRPC_PORT}"
+    command: "-config.file=/etc/loki/loki.yaml"
+    restart: unless-stopped
+    networks:
+      - net
+
+  crmessenger-tempo:
+    image: grafana/tempo:latest
+    container_name: "${CRMESSENGER_TEMPO_CONTAINER_NAME}"
+    volumes:
+      - "${CRMESSENGER_TEMPO_CONFIG_FILE}:/etc/tempo/tempo.yaml:ro"
+      - "${CRMESSENGER_TEMPO_VOLUME_DIR}:/var/tempo"
+    ports:
+      - "${CRMESSENGER_TEMPO_HTTP_PORT}:${CRMESSENGER_TEMPO_HTTP_PORT}"
+      - "${CRMESSENGER_TEMPO_GRPC_PORT}:${CRMESSENGER_TEMPO_GRPC_PORT}"
+      - "${CRMESSENGER_TEMPO_OTLP_HTTP_PORT}:${CRMESSENGER_TEMPO_OTLP_HTTP_PORT}"
+      - "${CRMESSENGER_TEMPO_OTLP_GRPC_PORT}:${CRMESSENGER_TEMPO_OTLP_GRPC_PORT}"
+    command:
+      - "-config.file=/etc/tempo/tempo.yaml"
+      - "-target=all"
+    restart: unless-stopped
+    networks:
+      - net
+
+  crmessenger-victoria-metrics:
+    image: victoriametrics/victoria-metrics:latest
+    container_name: "${CRMESSENGER_VICTORIA_METRICS_CONTAINER_NAME}"
+    volumes:
+      - "${CRMESSENGER_VICTORIA_METRICS_VOLUME_DIR}:/data"
+      - "${CRMESSENGER_VICTORIA_METRICS_CONFIG_FILE}:/etc/victoria-metrics/victoria-metrics.yml:ro"
+    ports:
+      - "${CRMESSENGER_VICTORIA_METRICS_HTTP_PORT}:${CRMESSENGER_VICTORIA_METRICS_HTTP_PORT}"
+    command:
+      - "-configFile=/etc/victoria-metrics-config.yml"
+    restart: unless-stopped
+    networks:
+      - net

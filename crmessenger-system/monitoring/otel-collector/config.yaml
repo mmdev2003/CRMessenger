@@ -1,0 +1,321 @@
+
+receivers:
+  # OTLP receiver для трассировок, метрик и логов через gRPC и HTTP
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:$CRMESSENGER_OTEL_COLLECTOR_GRPC_PORT
+        # Настройки для производственной среды
+        max_recv_msg_size: 4194304  # 4MB
+        max_concurrent_streams: 16
+        keepalive:
+          server_parameters:
+            max_connection_idle: 11s
+            max_connection_age: 12s
+            max_connection_age_grace: 13s
+            time: 30s
+            timeout: 5s
+          enforcement_policy:
+            min_time: 10s
+            permit_without_stream: true
+      http:
+        endpoint: 0.0.0.0:$CRMESSENGER_OTEL_COLLECTOR_HTTP_PORT
+        cors:
+          allowed_origins:
+            - "*"
+          allowed_headers:
+            - "*"
+
+#  # Loki receiver для получения логов от Promtail (если используется)
+#  loki:
+#    protocols:
+#      http:
+#        endpoint: 0.0.0.0:3500
+#      grpc:
+#        endpoint: 0.0.0.0:3600
+#    use_incoming_timestamp: true
+
+  # Filelog receiver для сбора логов из файлов (альтернатива Promtail)
+  filelog:
+    include:
+      - /var/lib/docker/containers/*/*.log
+      - /var/log/app/*.log
+    exclude:
+      - /var/log/app/debug.log
+      - /var/log/pods/*/otel-collector/*.log
+    include_file_path: true
+    include_file_name: true
+    operators:
+      # Новый container parser для автоматического определения формата
+      - id: container-parser
+        type: container
+        # Дополнительные операторы для не-контейнерных логов
+      - type: router
+        id: format-router
+        routes:
+          - output: json-parser
+            expr: 'body matches "^\\{"'
+          - output: extract_metadata_from_filepath
+            expr: 'true'
+      # JSON parser для structured logs
+      - type: json_parser
+        id: json-parser
+        output: extract_metadata_from_filepath
+        timestamp:
+          parse_from: attributes.time
+          layout: '%Y-%m-%dT%H:%M:%S.%fZ'
+      # Извлечение метаданных из пути файла
+      - type: metadata
+        id: extract_metadata_from_filepath
+        resource:
+          service.name: 'EXPR(attributes.container_name || "unknown")'
+          service.namespace: 'EXPR(attributes.k8s_namespace_name || "default")'
+
+  # Docker Stats receiver для метрик контейнеров
+  docker_stats:
+    endpoint: unix:///var/run/docker.sock
+    collection_interval: 30s
+    container_labels_to_metric_labels:
+      # Маппинг Docker labels в метрики
+      com.docker.compose.service: service_name
+      com.docker.compose.project: project_name
+    excluded_images:
+      - "otel/opentelemetry-collector*"
+    metrics:
+      container.cpu.usage.total:
+        enabled: true
+      container.memory.usage.total:
+        enabled: true
+      container.network.io.usage.tx_bytes:
+        enabled: true
+      container.network.io.usage.rx_bytes:
+        enabled: true
+
+#  # Receiver для Prometheus метрик (если нужен scraping)
+#  prometheus:
+#    config:
+#      scrape_configs:
+#        - job_name: 'otel-collector'
+#          scrape_interval: 15s
+#          static_configs:
+#            - targets: ['localhost:8888']
+
+  # Host metrics для мониторинга самого коллектора
+  hostmetrics:
+    collection_interval: 30s
+    scrapers:
+      cpu:
+        metrics:
+          system.cpu.utilization:
+            enabled: true
+      disk: {}
+      load: {}
+      filesystem:
+        exclude_mount_points:
+          mount_points: ["/dev/*", "/proc/*", "/sys/*", "/var/lib/docker/*"]
+          match_type: regexp
+      memory: {}
+      network: {}
+      process:
+        mute_process_name_error: true
+
+# ==============================================================================
+# PROCESSORS - компоненты для обработки данных
+# ==============================================================================
+processors:
+  # Batch processor для оптимизации отправки данных
+  batch:
+    send_batch_size: 1024
+    send_batch_max_size: 2048
+    timeout: 5s
+
+  # Memory limiter для предотвращения OOM
+  memory_limiter:
+    check_interval: 1s
+    limit_percentage: 75
+    spike_limit_percentage: 15
+
+  # Resource processor для добавления метаданных
+  resource:
+    attributes:
+      - action: insert
+        key: service.version
+        value: "v1.0.0"
+      - action: upsert
+        key: environment
+        value: "${env:ENVIRONMENT}"
+      - action: insert
+        key: deployment.environment
+        value: "${env:ENVIRONMENT}"
+
+  # Attributes processor для обработки логов с Loki
+  attributes/loki:
+    actions:
+      # Указываем какие атрибуты использовать как labels в Loki
+      - action: insert
+        key: loki.resource.labels
+        value: service.name,service.namespace,environment,host.name
+      - action: insert
+        key: loki.attribute.labels
+        value: level,trace_id,span_id
+
+  # Transform processor для метрик
+  transform/metrics:
+    metric_statements:
+      - context: metric
+        statements:
+          # Добавляем deployment.environment label ко всем метрикам
+          - set(resource.attributes["deployment.environment"], resource.attributes["environment"]) where resource.attributes["environment"] != nil
+
+  # Resource detection для автоматического обнаружения ресурсов
+  resourcedetection:
+    detectors: [env, system, docker]
+    timeout: 5s
+    override: false
+    system:
+      hostname_sources: [os]
+
+# ==============================================================================
+# EXPORTERS - компоненты для экспорта данных
+# ==============================================================================
+exporters:
+  # VictoriaMetrics для метрик
+  prometheusremotewrite/victoriametrics:
+    endpoint: "http://$CRMESSENGER_VICTORIA_METRICS_CONTAINER_NAME:$CRMESSENGER_VICTORIA_METRICS_HTTP_PORT/api/v1/write"
+    headers:
+      X-Prometheus-Remote-Write-Version: "0.1.0"
+    # Настройки таймаутов и ретраев
+    timeout: 30s
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 30s
+      max_elapsed_time: 300s
+    queue_config:
+      enabled: true
+      queue_size: 5000
+      num_consumers: 10
+    # Дополнительные метаданные
+    resource_to_telemetry_conversion:
+      enabled: true
+
+  # Loki для логов
+  loki/logs:
+    endpoint: "http://$CRMESSENGER_LOKI_CONTAINER_NAME:$CRMESSENGER_LOKI_HTTP_PORT/loki/api/v1/push"
+    tenant_id: "default"
+    timeout: 30s
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 30s
+      max_elapsed_time: 300s
+    # Настройки для structured metadata (Loki 3.0+)
+    default_labels_enabled:
+      exporter: loki
+      job: otel-collector
+
+  # Tempo для трассировок
+  otlp/tempo:
+    endpoint: "http://$CRMESSENGER_TEMPO_CONTAINER_NAME:$CRMESSENGER_TEMPO_OTLP_GRPC_PORT"
+    tls:
+      insecure: true
+    timeout: 30s
+    retry_on_failure:
+      enabled: true
+      initial_interval: 5s
+      max_interval: 30s
+      max_elapsed_time: 300s
+    sending_queue:
+      enabled: true
+      queue_size: 1000
+      num_consumers: 10
+
+  # Debug exporter для отладки
+  debug:
+    verbosity: basic
+    sampling_initial: 5
+    sampling_thereafter: 200
+
+  # Logging exporter для простого логирования
+  logging:
+    verbosity: normal
+
+# ==============================================================================
+# EXTENSIONS - дополнительные возможности
+# ==============================================================================
+extensions:
+  # Health check для мониторинга состояния коллектора
+  health_check:
+    endpoint: 0.0.0.0:13133
+    path: "/health"
+
+  # pprof для профилирования производительности
+  pprof:
+    endpoint: 0.0.0.0:1777
+
+  # zpages для диагностики
+  zpages:
+    endpoint: 0.0.0.0:55679
+
+  # Memory ballast для стабилизации памяти
+  memory_ballast:
+    size_mib: 165
+
+# ==============================================================================
+# SERVICE - конфигурация пайплайнов и расширений
+# ==============================================================================
+service:
+  # Включаем расширения
+  extensions: [health_check, pprof, zpages, memory_ballast]
+
+  # Настройки телеметрии самого коллектора
+  telemetry:
+    logs:
+      level: "info"
+      development: false
+      encoding: "json"
+      disable_caller: false
+      disable_stacktrace: false
+      output_paths: ["stdout"]
+      error_output_paths: ["stderr"]
+    metrics:
+      level: normal
+      address: 0.0.0.0:8888
+
+  # Пайплайны для обработки различных типов данных
+  pipelines:
+    # Пайплайн для трассировок
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, resourcedetection, resource, batch]
+      exporters: [otlp/tempo]
+
+    # Пайплайн для метрик
+    metrics:
+      receivers: [otlp, hostmetrics, prometheus, docker_stats]
+      processors: [memory_limiter, resourcedetection, resource, transform/metrics, batch]
+      exporters: [prometheusremotewrite/victoriametrics]
+
+    # Пайплайн для логов от приложений (OTLP)
+    logs/otlp:
+      receivers: [otlp]
+      processors: [memory_limiter, resourcedetection, resource, attributes/loki, batch]
+      exporters: [loki/logs]
+
+    # Пайплайн для логов от Promtail (если используется)
+    logs/promtail:
+      receivers: [loki]
+      processors: [memory_limiter, resource, batch]
+      exporters: [loki/logs]
+
+    # Пайплайн для логов из файлов (альтернатива Promtail)
+    logs/files:
+      receivers: [filelog]
+      processors: [memory_limiter, resourcedetection, resource, attributes/loki, batch]
+      exporters: [loki/logs]
+
+    # Отдельный пайплайн для метрик самого коллектора
+    metrics/internal:
+      receivers: [prometheus]
+      processors: [memory_limiter, batch]
+      exporters: [prometheusremotewrite/victoriametrics]

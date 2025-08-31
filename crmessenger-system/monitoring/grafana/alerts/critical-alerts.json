@@ -1,0 +1,286 @@
+{
+  "apiVersion": 1,
+  "groups": [
+    {
+      "name": "Critical Infrastructure Alerts",
+      "interval": "1m",
+      "rules": [
+        {
+          "uid": "cpu-critical",
+          "title": "🔥 CPU Usage Critical",
+          "condition": "C",
+          "data": [
+            {
+              "refId": "A",
+              "relativeTimeRange": {
+                "from": 300,
+                "to": 0
+              },
+              "datasourceUid": "victoria-metrics",
+              "model": {
+                "expr": "100 - (avg by (instance) (rate(node_cpu_seconds_total{mode=\"idle\"}[5m])) * 100)",
+                "refId": "A",
+                "interval": "",
+                "legendFormat": "{{instance}}"
+              }
+            },
+            {
+              "refId": "B",
+              "relativeTimeRange": {
+                "from": 300,
+                "to": 0
+              },
+              "datasourceUid": "victoria-metrics",
+              "model": {
+                "expr": "avg by (container) (rate(container_cpu_usage_seconds_total{container!=\"\"}[5m]) * 100)",
+                "refId": "B",
+                "interval": "",
+                "legendFormat": "{{container}}"
+              }
+            },
+            {
+              "refId": "C",
+              "datasourceUid": "__expr__",
+              "conditions": [
+                {
+                  "evaluator": {
+                    "params": [80],
+                    "type": "gt"
+                  },
+                  "operator": {
+                    "type": "and"
+                  },
+                  "query": {
+                    "params": ["A"]
+                  },
+                  "reducer": {
+                    "params": [],
+                    "type": "max"
+                  },
+                  "type": "query"
+                }
+              ],
+              "expression": "A",
+              "reducer": "max",
+              "settings": {
+                "mode": "replaceNonNumeric",
+                "replaceWithValue": 0
+              },
+              "type": "reduce"
+            }
+          ],
+          "noDataState": "NoData",
+          "execErrState": "Alerting",
+          "for": "3m",
+          "annotations": {
+            "__dashboardUid__": "system-overview",
+            "__panelId__": "1",
+            "description": "CPU использование превысило 80% и держится более 3 минут",
+            "runbook_url": "https://wiki.example.com/runbooks/high-cpu",
+            "summary": "⚠️ CPU критически высокий: {{ $values.A }}%"
+          },
+          "labels": {
+            "severity": "critical",
+            "team": "devops",
+            "component": "infrastructure"
+          }
+        },
+        {
+          "uid": "memory-critical",
+          "title": "🔥 Memory Usage Critical",
+          "condition": "C",
+          "data": [
+            {
+              "refId": "A",
+              "relativeTimeRange": {
+                "from": 300,
+                "to": 0
+              },
+              "datasourceUid": "victoria-metrics",
+              "model": {
+                "expr": "(1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100",
+                "refId": "A",
+                "interval": "",
+                "legendFormat": "{{instance}}"
+              }
+            },
+            {
+              "refId": "B",
+              "relativeTimeRange": {
+                "from": 300,
+                "to": 0
+              },
+              "datasourceUid": "victoria-metrics",
+              "model": {
+                "expr": "avg by (container) (container_memory_working_set_bytes{container!=\"\"} / container_spec_memory_limit_bytes{container!=\"\"} * 100)",
+                "refId": "B",
+                "interval": "",
+                "legendFormat": "{{container}}"
+              }
+            },
+            {
+              "refId": "C",
+              "datasourceUid": "__expr__",
+              "conditions": [
+                {
+                  "evaluator": {
+                    "params": [85],
+                    "type": "gt"
+                  },
+                  "operator": {
+                    "type": "and"
+                  },
+                  "query": {
+                    "params": ["A"]
+                  },
+                  "reducer": {
+                    "params": [],
+                    "type": "max"
+                  },
+                  "type": "query"
+                }
+              ],
+              "expression": "A",
+              "reducer": "max",
+              "type": "reduce"
+            }
+          ],
+          "noDataState": "NoData",
+          "execErrState": "Alerting",
+          "for": "3m",
+          "annotations": {
+            "__dashboardUid__": "system-overview",
+            "__panelId__": "2",
+            "description": "Memory использование превысило 85% и держится более 3 минут",
+            "runbook_url": "https://wiki.example.com/runbooks/high-memory",
+            "summary": "⚠️ Memory критически высокая: {{ $values.A }}%"
+          },
+          "labels": {
+            "severity": "critical",
+            "team": "devops",
+            "component": "infrastructure"
+          }
+        },
+        {
+          "uid": "http-500-errors",
+          "title": "🚨 HTTP 500 Errors Spike",
+          "condition": "D",
+          "data": [
+            {
+              "refId": "A",
+              "relativeTimeRange": {
+                "from": 300,
+                "to": 0
+              },
+              "datasourceUid": "victoria-metrics",
+              "model": {
+                "expr": "sum by (service, method, endpoint) (rate(http_requests_total{status=~\"5..\"}[1m]) * 60)",
+                "refId": "A",
+                "interval": "",
+                "legendFormat": "{{service}} {{method}} {{endpoint}}"
+              }
+            },
+            {
+              "refId": "B",
+              "relativeTimeRange": {
+                "from": 300,
+                "to": 0
+              },
+              "datasourceUid": "victoria-metrics",
+              "model": {
+                "expr": "sum by (service) (rate(http_requests_total{status=~\"5..\"}[1m])) / sum by (service) (rate(http_requests_total[1m])) * 100",
+                "refId": "B",
+                "interval": "",
+                "legendFormat": "{{service}} error rate"
+              }
+            },
+            {
+              "refId": "C",
+              "datasourceUid": "__expr__",
+              "conditions": [
+                {
+                  "evaluator": {
+                    "params": [10],
+                    "type": "gt"
+                  },
+                  "operator": {
+                    "type": "and"
+                  },
+                  "query": {
+                    "params": ["A"]
+                  },
+                  "reducer": {
+                    "params": [],
+                    "type": "sum"
+                  },
+                  "type": "query"
+                }
+              ],
+              "expression": "A",
+              "reducer": "sum",
+              "type": "reduce"
+            },
+            {
+              "refId": "D",
+              "datasourceUid": "__expr__",
+              "conditions": [
+                {
+                  "evaluator": {
+                    "params": [5],
+                    "type": "gt"
+                  },
+                  "operator": {
+                    "type": "or"
+                  },
+                  "query": {
+                    "params": ["B"]
+                  },
+                  "reducer": {
+                    "params": [],
+                    "type": "max"
+                  },
+                  "type": "query"
+                },
+                {
+                  "evaluator": {
+                    "params": [0],
+                    "type": "gt"
+                  },
+                  "operator": {
+                    "type": "and"
+                  },
+                  "query": {
+                    "params": ["C"]
+                  },
+                  "reducer": {
+                    "params": [],
+                    "type": "last"
+                  },
+                  "type": "query"
+                }
+              ],
+              "expression": "B",
+              "reducer": "last",
+              "type": "math"
+            }
+          ],
+          "noDataState": "OK",
+          "execErrState": "Alerting",
+          "for": "1m",
+          "annotations": {
+            "__dashboardUid__": "microservices-red",
+            "__panelId__": "3",
+            "description": "Обнаружен всплеск HTTP 500 ошибок",
+            "runbook_url": "https://wiki.example.com/runbooks/http-500-errors",
+            "summary": "🚨 HTTP 500 ошибки: {{ $values.A }} errors/min ({{ $values.B }}% error rate)"
+          },
+          "labels": {
+            "severity": "critical",
+            "team": "backend",
+            "component": "application"
+          }
+        }
+      ]
+    }
+  ]
+}
