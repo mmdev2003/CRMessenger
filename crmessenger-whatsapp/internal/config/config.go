@@ -3,17 +3,17 @@ package config
 func New() *Config {
 	return &Config{
 		DB: DB{
-			Username: "postgres",
-			Dbname:   "postgres",
-			Password: "postgres",
-			Host:     "147.45.164.75",
+			Username: "",
+			Dbname:   "",
+			Password: "",
+			Host:     "145.45.164.77",
 			Port:     "10005",
 		},
 		WaDeviceDB: DB{
-			Username: "postgres",
-			Dbname:   "postgres",
-			Password: "postgres",
-			Host:     "147.45.164.75",
+			Username: "",
+			Dbname:   "",
+			Password: "",
+			Host:     "137.35.164.75",
 			Port:     "10015",
 		},
 		Amocrm: Amocrm{
@@ -21,10 +21,10 @@ func New() *Config {
 			ApiChatURL:    "https://amojo.amocrm.ru/v2/origin/custom",
 			Messenger:     "Whatsapp",
 			BotName:       "Whatsapp",
-			BotID:         "6c773699-ebbf-4523-b64b-9fe7279409c6",
-			ChannelSecret: "05a49978df89d13417909498f4e168418db7a42c",
-			ChannelID:     "f82092ec-9ce1-495a-a240-c125cfd98042",
-			ChannelCode:   "ru.bngodev-test",
+			BotID:         "",
+			ChannelSecret: "",
+			ChannelID:     "",
+			ChannelCode:   "",
 		},
 		CRMessenger: CRMessenger{
 			CRMessengerWhatsapp: Server{
